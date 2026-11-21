@@ -1,0 +1,174 @@
+{% extends "base.html" %}
+
+{% block page_title %}Financial Reports & Export{% endblock %}
+
+{% block topbar_actions %}
+<a href="{{ url_for('reports.export_csv', start_date=start_date, end_date=end_date, category_id=category_id, type=tx_type) }}" class="btn btn-primary">
+    <i data-lucide="download"></i>
+    <span>Export CSV</span>
+</a>
+{% endblock %}
+
+{% block content %}
+<!-- Advanced Filter Bar -->
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">
+            <i data-lucide="filter"></i>
+            <span>Filter Transactions</span>
+        </h2>
+    </div>
+    <div class="card-body">
+        <form method="GET" action="{{ url_for('reports.index') }}">
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; align-items: flex-end;">
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label class="form-label" for="start_date">Start Date</label>
+                    <input type="date" id="start_date" name="start_date" class="form-control" value="{{ start_date }}">
+                </div>
+
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label class="form-label" for="end_date">End Date</label>
+                    <input type="date" id="end_date" name="end_date" class="form-control" value="{{ end_date }}">
+                </div>
+
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label class="form-label" for="category_id">Category (Expenses)</label>
+                    <select id="category_id" name="category_id" class="form-control">
+                        <option value="">All Categories</option>
+                        {% for cat in categories %}
+                            <option value="{{ cat.id }}" {% if category_id == cat.id|string %}selected{% endif %}>
+                                {{ cat.name }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label class="form-label" for="type">Record Type</label>
+                    <select id="type" name="type" class="form-control">
+                        <option value="all" {% if tx_type == 'all' %}selected{% endif %}>All Records</option>
+                        <option value="expense" {% if tx_type == 'expense' %}selected{% endif %}>Expenses Only</option>
+                        <option value="income" {% if tx_type == 'income' %}selected{% endif %}>Income Only</option>
+                    </select>
+                </div>
+
+                <div style="display: flex; gap: 8px;">
+                    <button type="submit" class="btn btn-primary" style="flex: 1;">
+                        <i data-lucide="search"></i>
+                        <span>Apply</span>
+                    </button>
+                    <a href="{{ url_for('reports.index') }}" class="btn btn-secondary" title="Reset Filters">
+                        <i data-lucide="rotate-ccw"></i>
+                    </a>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Summary Metrics for Filtered Set -->
+<div class="metrics-grid">
+    <div class="stat-card" style="border-left: 4px solid var(--emerald-500);">
+        <div class="stat-header">
+            <span class="stat-title">Filtered Income</span>
+            <div class="stat-icon" style="background: var(--emerald-50); color: var(--emerald-600);">
+                <i data-lucide="trending-up"></i>
+            </div>
+        </div>
+        <div class="stat-value" style="color: var(--emerald-600);">
+            {{ total_income|currency }}
+        </div>
+    </div>
+
+    <div class="stat-card" style="border-left: 4px solid var(--rose-500);">
+        <div class="stat-header">
+            <span class="stat-title">Filtered Expenses</span>
+            <div class="stat-icon" style="background: var(--rose-50); color: var(--rose-600);">
+                <i data-lucide="trending-down"></i>
+            </div>
+        </div>
+        <div class="stat-value" style="color: var(--rose-600);">
+            {{ total_expense|currency }}
+        </div>
+    </div>
+
+    <div class="stat-card" style="border-left: 4px solid var(--purple-500);">
+        <div class="stat-header">
+            <span class="stat-title">Filtered Net Savings</span>
+            <div class="stat-icon" style="background: var(--purple-50); color: var(--purple-600);">
+                <i data-lucide="scale"></i>
+            </div>
+        </div>
+        <div class="stat-value" style="color: {% if net_savings >= 0 %}var(--purple-600){% else %}var(--rose-600){% endif %};">
+            {{ net_savings|currency }}
+        </div>
+    </div>
+</div>
+
+<!-- Results Table -->
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">
+            <i data-lucide="file-spreadsheet"></i>
+            <span>Generated Report ({{ records|length }} Records)</span>
+        </h2>
+        <a href="{{ url_for('reports.export_csv', start_date=start_date, end_date=end_date, category_id=category_id, type=tx_type) }}" class="btn btn-secondary btn-sm">
+            <i data-lucide="file-down" style="width: 14px; height: 14px;"></i>
+            <span>Download CSV</span>
+        </a>
+    </div>
+    <div class="table-responsive">
+        <table class="custom-table">
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Type</th>
+                    <th>Category / Source</th>
+                    <th>Description</th>
+                    <th>Payment Method</th>
+                    <th style="text-align: right;">Amount</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if records %}
+                    {% for r in records %}
+                    <tr>
+                        <td style="color: var(--text-muted); font-size: 0.85rem; white-space: nowrap;">
+                            {{ r.tx_date|format_date }}
+                        </td>
+                        <td>
+                            <span class="cat-badge" style="background-color: {% if r.type == 'Income' %}var(--emerald-100); color: var(--emerald-700);{% else %}var(--rose-100); color: var(--rose-700);{% endif %}">
+                                {{ r.type }}
+                            </span>
+                        </td>
+                        <td>
+                            <span style="font-weight: 600; color: var(--text-primary);">
+                                {{ r.category_source }}
+                            </span>
+                        </td>
+                        <td style="color: var(--text-secondary);">
+                            {{ r.description or '-' }}
+                        </td>
+                        <td style="color: var(--text-muted); font-size: 0.82rem;">
+                            {{ r.payment_method }}
+                        </td>
+                        <td style="text-align: right;">
+                            <span class="{% if r.type == 'Income' %}amount-income{% else %}amount-expense{% endif %}">
+                                {% if r.type == 'Income' %}+{% else %}-{% endif %} {{ r.amount|currency }}
+                            </span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr>
+                        <td colspan="6" style="text-align: center; padding: 48px; color: var(--text-muted);">
+                            <i data-lucide="folder-search" style="width: 38px; height: 38px; opacity: 0.4; margin-bottom: 8px;"></i>
+                            <p>No financial records matched the selected filters.</p>
+                        </td>
+                    </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Create Account - Smart Expense Tracker</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/auth.css') }}">
+</head>
+<body class="auth-page">
+    <div class="auth-container">
+        <div class="auth-header">
+            <div class="auth-logo">
+                <i data-lucide="user-plus"></i>
+            </div>
+            <h1 class="auth-title">Create Account</h1>
+            <p class="auth-subtitle">Join today to gain total control of your money</p>
+        </div>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="flash-container" style="margin-bottom: 20px;">
+                    {% for category, message in messages %}
+                        <div class="flash-toast flash-{{ category }}">
+                            <span>{{ message }}</span>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+
+        <form action="{{ url_for('auth.register') }}" method="POST">
+            <div class="form-group">
+                <label class="form-label" for="username">Username</label>
+                <input type="text" id="username" name="username" class="form-control" placeholder="e.g. john_doe" value="{{ username or '' }}" required autofocus>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="email">Email Address</label>
+                <input type="email" id="email" name="email" class="form-control" placeholder="john@example.com" value="{{ email or '' }}" required>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="currency">Preferred Currency</label>
+                <select id="currency" name="currency" class="form-control">
+                    <option value="$" selected>USD ($) - US Dollar</option>
+                    <option value="₹">INR (₹) - Indian Rupee</option>
+                    <option value="€">EUR (€) - Euro</option>
+                    <option value="£">GBP (£) - British Pound</option>
+                    <option value="¥">JPY/CNY (¥) - Yen / Yuan</option>
+                    <option value="CAD$">CAD (CAD$) - Canadian Dollar</option>
+                    <option value="AUD$">AUD (AUD$) - Australian Dollar</option>
+                </select>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label" for="password">Password</label>
+                    <input type="password" id="password" name="password" class="form-control" placeholder="Min. 6 chars" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="confirm_password">Confirm</label>
+                    <input type="password" id="confirm_password" name="confirm_password" class="form-control" placeholder="Re-enter password" required>
+                </div>
+            </div>
+
+            <button type="submit" class="btn btn-primary auth-btn">
+                <span>Register Account</span>
+                <i data-lucide="check"></i>
+            </button>
+        </form>
+
+        <div class="auth-footer">
+            Already have an account?
+            <a href="{{ url_for('auth.login') }}">Sign In</a>
+        </div>
+    </div>
+
+    <script>
+        if (window.lucide) {
+            lucide.createIcons();
+        }
+    </script>
+</body>
+</html>

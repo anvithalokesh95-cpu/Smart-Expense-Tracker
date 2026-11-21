@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+
+{% block page_title %}Preferences & Settings{% endblock %}
+
+{% block content %}
+<div style="max-width: 800px; display: flex; flex-direction: column; gap: 24px;">
+    <!-- Profile & Currency Settings Card -->
+    <div class="card">
+        <div class="card-header">
+            <h2 class="card-title">
+                <i data-lucide="sliders"></i>
+                <span>General Preferences</span>
+            </h2>
+        </div>
+        <div class="card-body">
+            <form action="{{ url_for('auth.profile') }}" method="POST">
+                <input type="hidden" name="action" value="update_settings">
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Username</label>
+                        <input type="text" class="form-control" value="{{ user.username }}" disabled style="background-color: #F8FAFC;">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Email Address</label>
+                        <input type="email" class="form-control" value="{{ user.email }}" disabled style="background-color: #F8FAFC;">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="currency">Display Currency Symbol</label>
+                    <select id="currency" name="currency" class="form-control" style="max-width: 320px;">
+                        <option value="$" {% if user.currency == '$' %}selected{% endif %}>USD ($)</option>
+                        <option value="₹" {% if user.currency == '₹' %}selected{% endif %}>INR (₹)</option>
+                        <option value="€" {% if user.currency == '€' %}selected{% endif %}>EUR (€)</option>
+                        <option value="£" {% if user.currency == '£' %}selected{% endif %}>GBP (£)</option>
+                        <option value="¥" {% if user.currency == '¥' %}selected{% endif %}>JPY / CNY (¥)</option>
+                        <option value="CAD$" {% if user.currency == 'CAD$' %}selected{% endif %}>CAD (CAD$)</option>
+                        <option value="AUD$" {% if user.currency == 'AUD$' %}selected{% endif %}>AUD (AUD$)</option>
+                    </select>
+                </div>
+
+                <button type="submit" class="btn btn-primary">
+                    <i data-lucide="save"></i>
+                    <span>Save Preferences</span>
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Security & Password Card -->
+    <div class="card">
+        <div class="card-header">
+            <h2 class="card-title">
+                <i data-lucide="shield-check"></i>
+                <span>Security & Password</span>
+            </h2>
+        </div>
+        <div class="card-body">
+            <form action="{{ url_for('auth.profile') }}" method="POST">
+                <input type="hidden" name="action" value="change_password">
+
+                <div class="form-group">
+                    <label class="form-label" for="old_password">Current Password</label>
+                    <input type="password" id="old_password" name="old_password" class="form-control" placeholder="••••••••" required>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label" for="new_password">New Password</label>
+                        <input type="password" id="new_password" name="new_password" class="form-control" placeholder="Min. 6 characters" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="confirm_new_password">Confirm New Password</label>
+                        <input type="password" id="confirm_new_password" name="confirm_new_password" class="form-control" placeholder="Re-type new password" required>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn btn-secondary">
+                    <i data-lucide="lock"></i>
+                    <span>Update Password</span>
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

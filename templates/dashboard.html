@@ -1,0 +1,373 @@
+{% extends "base.html" %}
+
+{% block page_title %}Financial Dashboard{% endblock %}
+
+{% block topbar_actions %}
+<button class="btn btn-primary" onclick="openModal('modal-add-expense')">
+    <i data-lucide="plus"></i>
+    <span>Add Expense</span>
+</button>
+<button class="btn btn-secondary" onclick="openModal('modal-add-income')">
+    <i data-lucide="arrow-down-left"></i>
+    <span>Add Income</span>
+</button>
+{% endblock %}
+
+{% block content %}
+<!-- Budget Warning / Danger Banner -->
+{% if budget_status == 'danger' %}
+<div class="alert-banner alert-banner-danger">
+    <i data-lucide="alert-octagon"></i>
+    <span><strong>Budget Alert!</strong> You have exceeded your overall monthly budget limit of {{ monthly_budget|currency }}. (Spent: {{ monthly_spending|currency }})</span>
+</div>
+{% elif budget_status == 'warning' %}
+<div class="alert-banner alert-banner-warning">
+    <i data-lucide="alert-triangle"></i>
+    <span><strong>Budget Notice:</strong> You have spent {{ budget_pct }}% of your monthly budget ({{ monthly_spending|currency }} / {{ monthly_budget|currency }}). Watch non-essential expenses!</span>
+</div>
+{% endif %}
+
+<!-- Key Metrics Stat Cards Grid -->
+<div class="metrics-grid">
+    <!-- Current Net Balance -->
+    <div class="stat-card card-balance">
+        <div class="stat-header">
+            <span class="stat-title">Current Net Balance</span>
+            <div class="stat-icon">
+                <i data-lucide="wallet"></i>
+            </div>
+        </div>
+        <div class="stat-value" style="color: {% if current_balance >= 0 %}var(--purple-600){% else %}var(--rose-600){% endif %};">
+            {{ current_balance|currency }}
+        </div>
+        <div class="stat-sub">
+            <i data-lucide="shield-check" style="width: 14px; height: 14px;"></i>
+            <span>All-time Net Available</span>
+        </div>
+    </div>
+
+    <!-- Total Income -->
+    <div class="stat-card card-income">
+        <div class="stat-header">
+            <span class="stat-title">Total Income</span>
+            <div class="stat-icon">
+                <i data-lucide="trending-up"></i>
+            </div>
+        </div>
+        <div class="stat-value" style="color: var(--emerald-600);">
+            {{ total_income|currency }}
+        </div>
+        <div class="stat-sub">
+            <i data-lucide="calendar" style="width: 14px; height: 14px;"></i>
+            <span>{{ monthly_income|currency }} this month</span>
+        </div>
+    </div>
+
+    <!-- Total Expenses -->
+    <div class="stat-card card-expense">
+        <div class="stat-header">
+            <span class="stat-title">Total Expenses</span>
+            <div class="stat-icon">
+                <i data-lucide="trending-down"></i>
+            </div>
+        </div>
+        <div class="stat-value" style="color: var(--rose-600);">
+            {{ total_expenses|currency }}
+        </div>
+        <div class="stat-sub">
+            <i data-lucide="calendar" style="width: 14px; height: 14px;"></i>
+            <span>{{ monthly_spending|currency }} this month</span>
+        </div>
+    </div>
+
+    <!-- Monthly Budget Tracker -->
+    <div class="stat-card card-budget">
+        <div class="stat-header">
+            <span class="stat-title">Monthly Budget</span>
+            <div class="stat-icon">
+                <i data-lucide="target"></i>
+            </div>
+        </div>
+        <div class="stat-value" style="color: var(--blue-600);">
+            {% if monthly_budget > 0 %}
+                {{ monthly_budget|currency }}
+            {% else %}
+                <span style="font-size: 1.1rem; color: var(--text-muted); font-weight: 600;">Not Set</span>
+            {% endif %}
+        </div>
+        {% if monthly_budget > 0 %}
+            <div class="progress-bar-wrap">
+                <div class="progress-bar-fill {% if budget_status == 'danger' %}fill-danger{% elif budget_status == 'warning' %}fill-warning{% else %}fill-success{% endif %}"
+                     style="width: {{ budget_pct }}%;"></div>
+            </div>
+            <div class="stat-sub" style="justify-content: space-between;">
+                <span>{{ budget_pct }}% used</span>
+                <a href="{{ url_for('budgets.index') }}" style="color: var(--purple-600); font-weight: 600;">Manage &rarr;</a>
+            </div>
+        {% else %}
+            <div class="stat-sub">
+                <a href="{{ url_for('budgets.index') }}" style="color: var(--purple-600); font-weight: 600;">+ Set a monthly budget</a>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Charts Section Grid -->
+<div class="charts-grid">
+    <!-- Monthly Spending Trends Chart -->
+    <div class="card">
+        <div class="card-header">
+            <h2 class="card-title">
+                <i data-lucide="line-chart"></i>
+                <span>Spending & Income Trends (Last 6 Months)</span>
+            </h2>
+            <a href="{{ url_for('analytics.index') }}" class="btn btn-secondary btn-sm">Full Analytics</a>
+        </div>
+        <div class="card-body">
+            <div class="chart-container">
+                <canvas id="chart-monthly-trends"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Category Distribution Donut Chart -->
+    <div class="card">
+        <div class="card-header">
+            <h2 class="card-title">
+                <i data-lucide="pie-chart"></i>
+                <span>Expense by Category</span>
+            </h2>
+            <span style="font-size: 0.78rem; color: var(--text-muted); font-weight: 600;">This Month</span>
+        </div>
+        <div class="card-body">
+            <div class="chart-container" style="min-height: 280px;">
+                <canvas id="chart-category-donut"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Transactions & Smart Insights Section -->
+<div class="charts-grid" style="grid-template-columns: 1.8fr 1.2fr;">
+    <!-- Recent Transactions Table -->
+    <div class="card">
+        <div class="card-header">
+            <h2 class="card-title">
+                <i data-lucide="clock"></i>
+                <span>Recent Activity</span>
+            </h2>
+            <div style="display: flex; gap: 8px;">
+                <a href="{{ url_for('expenses.index') }}" class="btn btn-secondary btn-sm">Expenses</a>
+                <a href="{{ url_for('incomes.index') }}" class="btn btn-secondary btn-sm">Income</a>
+            </div>
+        </div>
+        <div class="table-responsive">
+            <table class="custom-table">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Category / Source</th>
+                        <th>Description</th>
+                        <th>Method</th>
+                        <th style="text-align: right;">Amount</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if recent_transactions %}
+                        {% for tx in recent_transactions %}
+                        <tr>
+                            <td style="color: var(--text-muted); font-size: 0.82rem; white-space: nowrap;">
+                                {{ tx.tx_date|format_date }}
+                            </td>
+                            <td>
+                                <span class="cat-badge" style="background-color: {{ tx.category_color }}15; color: {{ tx.category_color }};">
+                                    <i data-lucide="{{ tx.category_icon or 'tag' }}" style="width: 14px; height: 14px;"></i>
+                                    <span>{{ tx.category_name }}</span>
+                                </span>
+                            </td>
+                            <td style="font-weight: 500;">
+                                {{ tx.description or '-' }}
+                            </td>
+                            <td style="color: var(--text-muted); font-size: 0.8rem;">
+                                {{ tx.payment_method }}
+                            </td>
+                            <td style="text-align: right;">
+                                <span class="{% if tx.type == 'income' %}amount-income{% else %}amount-expense{% endif %}">
+                                    {% if tx.type == 'income' %}+{% else %}-{% endif %} {{ tx.amount|currency }}
+                                </span>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="5" style="text-align: center; padding: 36px; color: var(--text-muted);">
+                                <i data-lucide="inbox" style="width: 32px; height: 32px; margin-bottom: 8px; opacity: 0.5;"></i>
+                                <p>No financial activity recorded yet.</p>
+                                <button class="btn btn-primary btn-sm" onclick="openModal('modal-add-expense')" style="margin-top: 10px;">
+                                    Add First Expense
+                                </button>
+                            </td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Smart Spending Insights Card -->
+    <div class="card">
+        <div class="card-header">
+            <h2 class="card-title">
+                <i data-lucide="sparkles" style="color: var(--purple-600);"></i>
+                <span>Smart Insights & Tips</span>
+            </h2>
+            <a href="{{ url_for('analytics.index') }}" style="color: var(--purple-600); font-size: 0.82rem; font-weight: 600;">View All &rarr;</a>
+        </div>
+        <div class="card-body" style="display: flex; flex-direction: column; gap: 14px;">
+            {% if insights.top_category %}
+            <div style="background: var(--purple-50); border: 1px solid var(--purple-100); border-radius: var(--radius-md); padding: 14px 16px;">
+                <div style="font-size: 0.78rem; font-weight: 700; color: var(--purple-700); text-transform: uppercase; margin-bottom: 4px;">Top Spending Category</div>
+                <div style="display: flex; align-items: center; justify-content: space-between;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span class="cat-badge" style="background-color: {{ insights.top_category.color }}20; color: {{ insights.top_category.color }};">
+                            <i data-lucide="{{ insights.top_category.icon or 'tag' }}" style="width: 14px; height: 14px;"></i>
+                            <span>{{ insights.top_category.name }}</span>
+                        </span>
+                        <span style="font-size: 0.82rem; color: var(--text-secondary);">{{ insights.top_category.percentage }}% of spend</span>
+                    </div>
+                    <span style="font-weight: 700; font-size: 1rem; color: var(--text-primary);">{{ insights.top_category.amount|currency }}</span>
+                </div>
+            </div>
+            {% endif %}
+
+            {% for tip in insights.suggestions[:2] %}
+            <div style="background: #ffffff; border: 1px solid var(--border-light); border-radius: var(--radius-md); padding: 14px; display: flex; gap: 12px; align-items: flex-start;">
+                <div style="background: {% if tip.type == 'danger' %}var(--rose-100){% elif tip.type == 'warning' %}var(--amber-100){% elif tip.type == 'success' %}var(--emerald-100){% else %}var(--blue-100){% endif %};
+                            color: {% if tip.type == 'danger' %}var(--rose-600){% elif tip.type == 'warning' %}var(--amber-600){% elif tip.type == 'success' %}var(--emerald-600){% else %}var(--blue-600){% endif %};
+                            width: 34px; height: 34px; border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                    <i data-lucide="{{ tip.icon or 'lightbulb' }}" style="width: 18px; height: 18px;"></i>
+                </div>
+                <div>
+                    <h4 style="font-size: 0.88rem; font-weight: 700; color: var(--text-primary); margin-bottom: 2px;">{{ tip.title }}</h4>
+                    <p style="font-size: 0.8rem; color: var(--text-secondary); line-height: 1.4;">{{ tip.message }}</p>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block modals %}
+<!-- Modal: Add Expense -->
+<div class="modal-overlay" id="modal-add-expense">
+    <div class="modal-dialog">
+        <div class="modal-header">
+            <h3 class="modal-title">Record New Expense</h3>
+            <button class="modal-close" onclick="closeModal('modal-add-expense')">
+                <i data-lucide="x"></i>
+            </button>
+        </div>
+        <div class="modal-body">
+            <form action="{{ url_for('expenses.add') }}" method="POST">
+                <div class="form-group">
+                    <label class="form-label" for="add_amount">Amount ({{ session.get('currency', '$') }})</label>
+                    <input type="number" step="0.01" min="0.01" id="add_amount" name="amount" class="form-control" placeholder="0.00" required>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="add_category">Category</label>
+                    <select id="add_category" name="category_id" class="form-control" required>
+                        <option value="" disabled selected>Select category...</option>
+                        <option value="1">Food</option>
+                        <option value="2">Shopping</option>
+                        <option value="3">Travel</option>
+                        <option value="4">Education</option>
+                        <option value="5">Entertainment</option>
+                        <option value="6">Bills</option>
+                        <option value="7">Healthcare</option>
+                        <option value="8">Others</option>
+                    </select>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label" for="add_date">Date</label>
+                        <input type="date" id="add_date" name="expense_date" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="add_payment">Payment Method</label>
+                        <select id="add_payment" name="payment_method" class="form-control">
+                            <option value="Cash">Cash</option>
+                            <option value="Credit Card">Credit Card</option>
+                            <option value="Debit Card">Debit Card</option>
+                            <option value="UPI / Online">UPI / Online</option>
+                            <option value="Bank Transfer">Bank Transfer</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="add_desc">Description / Notes</label>
+                    <input type="text" id="add_desc" name="description" class="form-control" placeholder="e.g. Grocery shopping at Walmart">
+                </div>
+
+                <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 24px;">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('modal-add-expense')">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Expense</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Add Income -->
+<div class="modal-overlay" id="modal-add-income">
+    <div class="modal-dialog">
+        <div class="modal-header">
+            <h3 class="modal-title">Record Income</h3>
+            <button class="modal-close" onclick="closeModal('modal-add-income')">
+                <i data-lucide="x"></i>
+            </button>
+        </div>
+        <div class="modal-body">
+            <form action="{{ url_for('incomes.add') }}" method="POST">
+                <div class="form-group">
+                    <label class="form-label" for="income_source">Income Source</label>
+                    <input type="text" id="income_source" name="source" class="form-control" placeholder="e.g. Salary, Freelance project" required>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label" for="income_amount">Amount ({{ session.get('currency', '$') }})</label>
+                        <input type="number" step="0.01" min="0.01" id="income_amount" name="amount" class="form-control" placeholder="0.00" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="income_date">Date</label>
+                        <input type="date" id="income_date" name="income_date" class="form-control" required>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="income_description">Description / Notes</label>
+                    <input type="text" id="income_description" name="description" class="form-control" placeholder="e.g. Monthly salary from Tech Corp">
+                </div>
+
+                <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 24px;">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('modal-add-income')">Cancel</button>
+                    <button type="submit" class="btn btn-success">Save Income</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Set default date input values to today
+    const todayStr = new Date().toISOString().split('T')[0];
+    const addDateInput = document.getElementById('add_date');
+    const incDateInput = document.getElementById('income_date');
+    if (addDateInput) addDateInput.value = todayStr;
+    if (incDateInput) incDateInput.value = todayStr;
+</script>
+{% endblock %}

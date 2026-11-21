@@ -1,0 +1,192 @@
+{% extends "base.html" %}
+
+{% block page_title %}Income Management{% endblock %}
+
+{% block topbar_actions %}
+<button class="btn btn-success" onclick="openModal('modal-add-income')">
+    <i data-lucide="plus"></i>
+    <span>Add Income</span>
+</button>
+{% endblock %}
+
+{% block content %}
+<!-- Filter & Summary Bar -->
+<div class="filter-bar">
+    <form method="GET" action="{{ url_for('incomes.index') }}" class="filter-group">
+        <!-- Search Input -->
+        <input type="text" name="search" class="form-control" placeholder="Search source or notes..." value="{{ search_query }}" style="width: 240px;">
+
+        <!-- Month Filter -->
+        <input type="month" name="month" class="form-control" value="{{ selected_month }}" style="width: 170px;">
+
+        <button type="submit" class="btn btn-secondary btn-sm">
+            <i data-lucide="filter"></i>
+            <span>Filter</span>
+        </button>
+
+        {% if selected_month or search_query %}
+            <a href="{{ url_for('incomes.index') }}" class="btn btn-sm" style="color: var(--rose-600);">Clear</a>
+        {% endif %}
+    </form>
+
+    <div style="display: flex; align-items: center; gap: 10px;">
+        <span style="font-size: 0.85rem; color: var(--text-muted); font-weight: 600;">Total Income:</span>
+        <span style="font-size: 1.25rem; font-weight: 800; color: var(--emerald-600);">{{ total_income|currency }}</span>
+    </div>
+</div>
+
+<!-- Incomes Table Card -->
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">
+            <i data-lucide="wallet"></i>
+            <span>Income Records ({{ incomes|length }})</span>
+        </h2>
+    </div>
+    <div class="table-responsive">
+        <table class="custom-table">
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Income Source</th>
+                    <th>Description</th>
+                    <th>Amount</th>
+                    <th style="text-align: right;">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if incomes %}
+                    {% for inc in incomes %}
+                    <tr>
+                        <td style="color: var(--text-muted); font-size: 0.85rem; white-space: nowrap;">
+                            {{ inc.income_date|format_date }}
+                        </td>
+                        <td>
+                            <span class="cat-badge" style="background-color: var(--emerald-100); color: var(--emerald-600);">
+                                <i data-lucide="arrow-down-left" style="width: 14px; height: 14px;"></i>
+                                <span>{{ inc.source }}</span>
+                            </span>
+                        </td>
+                        <td style="font-weight: 500;">
+                            {{ inc.description or '-' }}
+                        </td>
+                        <td class="amount-income" style="font-size: 0.95rem;">
+                            + {{ inc.amount|currency }}
+                        </td>
+                        <td style="text-align: right; white-space: nowrap;">
+                            <button class="btn btn-secondary btn-icon" title="Edit Income" onclick="openEditIncomeModal({{ inc.id }})">
+                                <i data-lucide="edit-2" style="width: 15px; height: 15px;"></i>
+                            </button>
+                            <form action="{{ url_for('incomes.delete', income_id=inc.id) }}" method="POST" style="display: inline-block;" onsubmit="return confirmDelete('Are you sure you want to delete this income record?');">
+                                <button type="submit" class="btn btn-secondary btn-icon" style="color: var(--rose-600);" title="Delete Income">
+                                    <i data-lucide="trash-2" style="width: 15px; height: 15px;"></i>
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr>
+                        <td colspan="5" style="text-align: center; padding: 48px; color: var(--text-muted);">
+                            <i data-lucide="wallet" style="width: 38px; height: 38px; margin-bottom: 8px; opacity: 0.4;"></i>
+                            <p style="font-size: 0.95rem; font-weight: 500;">No income records found.</p>
+                            <button class="btn btn-success btn-sm" onclick="openModal('modal-add-income')" style="margin-top: 12px;">
+                                + Add Income Now
+                            </button>
+                        </td>
+                    </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block modals %}
+<!-- Modal: Add Income -->
+<div class="modal-overlay" id="modal-add-income">
+    <div class="modal-dialog">
+        <div class="modal-header">
+            <h3 class="modal-title">Record Income Source</h3>
+            <button class="modal-close" onclick="closeModal('modal-add-income')">
+                <i data-lucide="x"></i>
+            </button>
+        </div>
+        <div class="modal-body">
+            <form action="{{ url_for('incomes.add') }}" method="POST">
+                <div class="form-group">
+                    <label class="form-label" for="add_income_source">Source</label>
+                    <input type="text" id="add_income_source" name="source" class="form-control" placeholder="e.g. Salary, Freelance, Investment" list="sources_list" required autofocus>
+                    <datalist id="sources_list">
+                        {% for src in common_sources %}
+                            <option value="{{ src }}">
+                        {% endfor %}
+                    </datalist>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label" for="add_income_amount">Amount ({{ session.get('currency', '$') }})</label>
+                        <input type="number" step="0.01" min="0.01" id="add_income_amount" name="amount" class="form-control" placeholder="0.00" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="add_income_date">Date</label>
+                        <input type="date" id="add_income_date" name="income_date" class="form-control" value="{{ today }}" required>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="add_income_desc">Description / Notes</label>
+                    <input type="text" id="add_income_desc" name="description" class="form-control" placeholder="e.g. Monthly salary deposit">
+                </div>
+
+                <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 24px;">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('modal-add-income')">Cancel</button>
+                    <button type="submit" class="btn btn-success">Save Income</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Edit Income -->
+<div class="modal-overlay" id="modal-edit-income">
+    <div class="modal-dialog">
+        <div class="modal-header">
+            <h3 class="modal-title">Edit Income</h3>
+            <button class="modal-close" onclick="closeModal('modal-edit-income')">
+                <i data-lucide="x"></i>
+            </button>
+        </div>
+        <div class="modal-body">
+            <form id="edit-income-form" method="POST">
+                <div class="form-group">
+                    <label class="form-label" for="edit_income_source">Source</label>
+                    <input type="text" id="edit_income_source" name="source" class="form-control" required>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label" for="edit_income_amount">Amount ({{ session.get('currency', '$') }})</label>
+                        <input type="number" step="0.01" min="0.01" id="edit_income_amount" name="amount" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="edit_income_date">Date</label>
+                        <input type="date" id="edit_income_date" name="income_date" class="form-control" required>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="edit_income_description">Description / Notes</label>
+                    <input type="text" id="edit_income_description" name="description" class="form-control">
+                </div>
+
+                <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 24px;">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('modal-edit-income')">Cancel</button>
+                    <button type="submit" class="btn btn-success">Update Income</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

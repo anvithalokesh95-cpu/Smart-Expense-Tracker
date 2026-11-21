@@ -1,0 +1,182 @@
+{% extends "base.html" %}
+
+{% block page_title %}Smart Financial Analytics{% endblock %}
+
+{% block content %}
+<!-- Top Metrics Row: Savings Rate, Spending Change, Top Category -->
+<div class="metrics-grid">
+    <!-- Savings Rate Card -->
+    <div class="stat-card" style="border-left: 4px solid var(--emerald-500);">
+        <div class="stat-header">
+            <span class="stat-title">Monthly Savings Rate</span>
+            <div class="stat-icon" style="background: var(--emerald-50); color: var(--emerald-600);">
+                <i data-lucide="piggy-bank"></i>
+            </div>
+        </div>
+        <div class="stat-value" style="color: var(--emerald-600);">
+            {{ insights.savings_rate }}%
+        </div>
+        <div class="stat-sub">
+            <span>Net Saved: <strong>{{ insights.net_savings|currency }}</strong></span>
+        </div>
+    </div>
+
+    <!-- Month over Month Spending Change -->
+    <div class="stat-card" style="border-left: 4px solid var(--purple-500);">
+        <div class="stat-header">
+            <span class="stat-title">Monthly Spending Drift</span>
+            <div class="stat-icon" style="background: var(--purple-50); color: var(--purple-600);">
+                <i data-lucide="trending-up"></i>
+            </div>
+        </div>
+        <div class="stat-value" style="color: {% if insights.spending_change_pct > 0 %}var(--rose-600){% else %}var(--emerald-600){% endif %};">
+            {% if insights.spending_change_pct > 0 %}+{% endif %}{{ insights.spending_change_pct }}%
+        </div>
+        <div class="stat-sub">
+            <span>Compared to prior month ({{ insights.prev_expenses|currency }})</span>
+        </div>
+    </div>
+
+    <!-- Highest Spending Category -->
+    <div class="stat-card" style="border-left: 4px solid var(--blue-500);">
+        <div class="stat-header">
+            <span class="stat-title">Top Expense Driver</span>
+            <div class="stat-icon" style="background: var(--blue-50); color: var(--blue-600);">
+                <i data-lucide="award"></i>
+            </div>
+        </div>
+        <div class="stat-value" style="font-size: 1.4rem; color: var(--text-primary);">
+            {% if insights.top_category %}
+                {{ insights.top_category.name }}
+            {% else %}
+                <span style="color: var(--text-muted); font-size: 1.1rem;">N/A</span>
+            {% endif %}
+        </div>
+        <div class="stat-sub">
+            {% if insights.top_category %}
+                <span>{{ insights.top_category.amount|currency }} ({{ insights.top_category.percentage }}% of total)</span>
+            {% else %}
+                <span>No expense data logged yet</span>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Smart AI & Heuristic Recommendations Cards -->
+<div class="card" style="background: linear-gradient(135deg, #FAF5FF, #EFF6FF); border-color: var(--purple-200);">
+    <div class="card-header" style="border-bottom-color: rgba(139, 92, 246, 0.1);">
+        <h2 class="card-title">
+            <i data-lucide="sparkles" style="color: var(--purple-600);"></i>
+            <span>Intelligent Spending Insights & Saving Suggestions</span>
+        </h2>
+        <span class="cat-badge" style="background: var(--purple-200); color: var(--purple-700);">Dynamic Advice</span>
+    </div>
+    <div class="card-body">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px;">
+            {% for suggestion in insights.suggestions %}
+            <div style="background: #ffffff; border-radius: var(--radius-md); padding: 18px; border: 1px solid var(--border-light); display: flex; gap: 14px; box-shadow: var(--shadow-sm);">
+                <div style="background: {% if suggestion.type == 'danger' %}var(--rose-100){% elif suggestion.type == 'warning' %}var(--amber-100){% elif suggestion.type == 'success' %}var(--emerald-100){% else %}var(--blue-100){% endif %};
+                            color: {% if suggestion.type == 'danger' %}var(--rose-600){% elif suggestion.type == 'warning' %}var(--amber-600){% elif suggestion.type == 'success' %}var(--emerald-600){% else %}var(--blue-600){% endif %};
+                            width: 40px; height: 40px; border-radius: var(--radius-md); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                    <i data-lucide="{{ suggestion.icon or 'lightbulb' }}" style="width: 20px; height: 20px;"></i>
+                </div>
+                <div>
+                    <h3 style="font-size: 0.95rem; font-weight: 700; color: var(--text-primary); margin-bottom: 4px;">{{ suggestion.title }}</h3>
+                    <p style="font-size: 0.84rem; color: var(--text-secondary); line-height: 1.5;">{{ suggestion.message }}</p>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<!-- Charts Section -->
+<div class="charts-grid">
+    <!-- Income vs Expense Bar Chart -->
+    <div class="card">
+        <div class="card-header">
+            <h2 class="card-title">
+                <i data-lucide="bar-chart-2"></i>
+                <span>Income vs Expenses (Monthly Comparison)</span>
+            </h2>
+        </div>
+        <div class="card-body">
+            <div class="chart-container" style="min-height: 320px;">
+                <canvas id="chart-income-vs-expense"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Category Distribution Donut -->
+    <div class="card">
+        <div class="card-header">
+            <h2 class="card-title">
+                <i data-lucide="pie-chart"></i>
+                <span>Spending by Category</span>
+            </h2>
+            <span style="font-size: 0.78rem; color: var(--text-muted); font-weight: 600;">Current Month</span>
+        </div>
+        <div class="card-body">
+            <div class="chart-container" style="min-height: 320px;">
+                <canvas id="chart-category-donut"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Monthly Category Breakdown Detail Table -->
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">
+            <i data-lucide="table"></i>
+            <span>Detailed Category Breakdown ({{ current_month_name }})</span>
+        </h2>
+    </div>
+    <div class="table-responsive">
+        <table class="custom-table">
+            <thead>
+                <tr>
+                    <th>Category</th>
+                    <th>Transactions</th>
+                    <th>Total Spent</th>
+                    <th>Share of Budget</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if category_breakdown %}
+                    {% for cat in category_breakdown %}
+                    <tr>
+                        <td>
+                            <span class="cat-badge" style="background-color: {{ cat.color }}15; color: {{ cat.color }};">
+                                <i data-lucide="{{ cat.icon or 'tag' }}" style="width: 14px; height: 14px;"></i>
+                                <span>{{ cat.name }}</span>
+                            </span>
+                        </td>
+                        <td style="color: var(--text-secondary); font-size: 0.88rem;">
+                            {{ cat.transaction_count }}
+                        </td>
+                        <td style="font-weight: 700; color: var(--text-primary);">
+                            {{ cat.total_amount|currency }}
+                        </td>
+                        <td style="width: 35%;">
+                            <div style="display: flex; align-items: center; gap: 12px;">
+                                <div class="progress-bar-wrap" style="flex: 1; height: 8px;">
+                                    <div class="progress-bar-fill" style="width: {{ cat.percentage }}%; background-color: {{ cat.color }};"></div>
+                                </div>
+                                <span style="font-size: 0.8rem; font-weight: 600; width: 45px; text-align: right;">{{ cat.percentage }}%</span>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr>
+                        <td colspan="4" style="text-align: center; padding: 36px; color: var(--text-muted);">
+                            No expenses logged for this month yet.
+                        </td>
+                    </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

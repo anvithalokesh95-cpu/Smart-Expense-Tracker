@@ -1,0 +1,200 @@
+{% extends "base.html" %}
+
+{% block page_title %}Budget Management{% endblock %}
+
+{% block topbar_actions %}
+<button class="btn btn-primary" onclick="openModal('modal-set-budget')">
+    <i data-lucide="plus"></i>
+    <span>Set Budget</span>
+</button>
+{% endblock %}
+
+{% block content %}
+<!-- Month Selector & Filter -->
+<div class="filter-bar">
+    <form method="GET" action="{{ url_for('budgets.index') }}" class="filter-group">
+        <label class="form-label" style="margin-bottom: 0;">Budget Period:</label>
+        <input type="month" name="month" class="form-control" value="{{ selected_month_str }}" style="width: 170px;" onchange="this.form.submit()">
+    </form>
+
+    <div style="font-size: 0.85rem; color: var(--text-muted);">
+        Showing budgets for <strong>{{ selected_month_str }}</strong>
+    </div>
+</div>
+
+<!-- Warning Banners if Any Budget is Exceeded or Nearing Limit -->
+{% if has_exceeded_budget %}
+<div class="alert-banner alert-banner-danger">
+    <i data-lucide="alert-octagon"></i>
+    <span><strong>Budget Alert!</strong> One or more of your category budgets have exceeded their allocated limit. Check details below.</span>
+</div>
+{% elif has_warning_budget %}
+<div class="alert-banner alert-banner-warning">
+    <i data-lucide="alert-triangle"></i>
+    <span><strong>Caution:</strong> One or more category budgets have reached 80% or more of their threshold.</span>
+</div>
+{% endif %}
+
+<!-- Overall Monthly Budget Card -->
+<div class="card" style="border-left: 4px solid var(--purple-600);">
+    <div class="card-header">
+        <h2 class="card-title">
+            <i data-lucide="target" style="color: var(--purple-600);"></i>
+            <span>Overall Monthly Budget</span>
+        </h2>
+        {% if overall_budget %}
+        <form action="{{ url_for('budgets.delete', budget_id=overall_budget.id) }}" method="POST" onsubmit="return confirmDelete('Remove this overall monthly budget?');">
+            <button type="submit" class="btn btn-secondary btn-sm" style="color: var(--rose-600);">Remove Budget</button>
+        </form>
+        {% endif %}
+    </div>
+    <div class="card-body">
+        {% if overall_budget %}
+            <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 8px;">
+                <div>
+                    <span style="font-size: 0.85rem; color: var(--text-muted); font-weight: 600;">SPENT / ALLOCATED</span>
+                    <div style="font-size: 1.6rem; font-weight: 800; color: var(--text-primary); margin-top: 4px;">
+                        {{ overall_budget.spent|currency }} <span style="font-size: 1rem; color: var(--text-muted); font-weight: 500;">/ {{ overall_budget.amount|currency }}</span>
+                    </div>
+                </div>
+                <div style="text-align: right;">
+                    <span class="cat-badge" style="
+                        background-color: {% if overall_budget.status == 'danger' %}var(--rose-100){% elif overall_budget.status == 'warning' %}var(--amber-100){% else %}var(--emerald-100){% endif %};
+                        color: {% if overall_budget.status == 'danger' %}var(--rose-700){% elif overall_budget.status == 'warning' %}var(--amber-700){% else %}var(--emerald-700){% endif %};
+                        font-size: 0.82rem;">
+                        {% if overall_budget.status == 'danger' %}EXCEEDED BY {{ (overall_budget.spent - overall_budget.amount)|currency }}{% elif overall_budget.status == 'warning' %}APPROACHING LIMIT ({{ overall_budget.percentage }}%){% else %}HEALTHY ({{ overall_budget.percentage }}% used){% endif %}
+                    </span>
+                    <div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 4px;">
+                        Remaining: <strong style="color: {% if overall_budget.remaining >= 0 %}var(--emerald-600){% else %}var(--rose-600){% endif %};">{{ overall_budget.remaining|currency }}</strong>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Progress Meter -->
+            <div class="progress-bar-wrap" style="height: 12px;">
+                <div class="progress-bar-fill {% if overall_budget.status == 'danger' %}fill-danger{% elif overall_budget.status == 'warning' %}fill-warning{% else %}fill-success{% endif %}"
+                     style="width: {{ [overall_budget.percentage, 100]|min }}%;"></div>
+            </div>
+        {% else %}
+            <div style="text-align: center; padding: 24px; color: var(--text-muted);">
+                <p>No overall monthly budget has been configured for this month.</p>
+                <button class="btn btn-primary btn-sm" onclick="openModal('modal-set-budget')" style="margin-top: 10px;">
+                    Set Overall Budget
+                </button>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Category Budgets Grid -->
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">
+            <i data-lucide="layers"></i>
+            <span>Category-Specific Budgets</span>
+        </h2>
+        <button class="btn btn-secondary btn-sm" onclick="openModal('modal-set-budget')">
+            <i data-lucide="plus" style="width: 14px; height: 14px;"></i>
+            <span>Add Category Limit</span>
+        </button>
+    </div>
+    <div class="card-body">
+        {% if category_budgets %}
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px;">
+                {% for b in category_budgets %}
+                <div style="background: #FAFAFD; border: 1px solid var(--border-light); border-radius: var(--radius-md); padding: 18px; display: flex; flex-direction: column; gap: 10px;">
+                    <div style="display: flex; align-items: center; justify-content: space-between;">
+                        <span class="cat-badge" style="background-color: {{ b.category_color }}20; color: {{ b.category_color }};">
+                            <i data-lucide="{{ b.category_icon or 'tag' }}" style="width: 14px; height: 14px;"></i>
+                            <span>{{ b.category_name }}</span>
+                        </span>
+
+                        <form action="{{ url_for('budgets.delete', budget_id=b.id) }}" method="POST" onsubmit="return confirmDelete('Delete budget for this category?');">
+                            <button type="submit" style="background: none; border: none; cursor: pointer; color: var(--text-muted); padding: 4px;">
+                                <i data-lucide="trash-2" style="width: 15px; height: 15px;"></i>
+                            </button>
+                        </form>
+                    </div>
+
+                    <div style="display: flex; justify-content: space-between; align-items: baseline; margin-top: 4px;">
+                        <span style="font-size: 1.15rem; font-weight: 700; color: var(--text-primary);">
+                            {{ b.spent_amount|currency }}
+                        </span>
+                        <span style="font-size: 0.85rem; color: var(--text-muted);">
+                            of {{ b.budget_amount|currency }}
+                        </span>
+                    </div>
+
+                    <div class="progress-bar-wrap">
+                        <div class="progress-bar-fill {% if b.status == 'danger' %}fill-danger{% elif b.status == 'warning' %}fill-warning{% else %}fill-success{% endif %}"
+                             style="width: {{ [b.percentage, 100]|min }}%;"></div>
+                    </div>
+
+                    <div style="display: flex; justify-content: space-between; font-size: 0.78rem; color: var(--text-secondary);">
+                        <span>{{ b.percentage }}% spent</span>
+                        <span style="font-weight: 600; color: {% if b.remaining >= 0 %}var(--emerald-600){% else %}var(--rose-600){% endif %};">
+                            {% if b.remaining >= 0 %}{{ b.remaining|currency }} left{% else %}Over by {{ (b.spent_amount - b.budget_amount)|currency }}{% endif %}
+                        </span>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div style="text-align: center; padding: 36px; color: var(--text-muted);">
+                <i data-lucide="pie-chart" style="width: 36px; height: 36px; opacity: 0.4; margin-bottom: 8px;"></i>
+                <p>No category budgets defined for this month.</p>
+                <button class="btn btn-secondary btn-sm" onclick="openModal('modal-set-budget')" style="margin-top: 10px;">
+                    Set Category Budget
+                </button>
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block modals %}
+<!-- Modal: Set / Update Budget -->
+<div class="modal-overlay" id="modal-set-budget">
+    <div class="modal-dialog">
+        <div class="modal-header">
+            <h3 class="modal-title">Set Monthly Budget</h3>
+            <button class="modal-close" onclick="closeModal('modal-set-budget')">
+                <i data-lucide="x"></i>
+            </button>
+        </div>
+        <div class="modal-body">
+            <form action="{{ url_for('budgets.set_budget') }}" method="POST">
+                <input type="hidden" name="month_str" value="{{ selected_month_str }}">
+
+                <div class="form-group">
+                    <label class="form-label" for="budget_type_select">Budget Scope</label>
+                    <select id="budget_type_select" name="budget_type" class="form-control">
+                        <option value="overall" selected>Overall Monthly Budget (Total)</option>
+                        <option value="category">Category-Specific Budget</option>
+                    </select>
+                </div>
+
+                <div class="form-group" id="budget_category_group" style="display: none;">
+                    <label class="form-label" for="category_id">Select Category</label>
+                    <select id="category_id" name="category_id" class="form-control">
+                        <option value="" disabled selected>Choose category...</option>
+                        {% for cat in categories %}
+                            <option value="{{ cat.id }}">{{ cat.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="budget_amount">Budget Amount Limit ({{ session.get('currency', '$') }})</label>
+                    <input type="number" step="0.01" min="0.01" id="budget_amount" name="amount" class="form-control" placeholder="e.g. 1500.00" required autofocus>
+                </div>
+
+                <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 24px;">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('modal-set-budget')">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Budget</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
